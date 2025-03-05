@@ -1,236 +1,302 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import axios from "axios";
+import { useField, useForm } from 'vee-validate';
+import * as yup from 'yup';
+import { toast } from 'vue3-toastify';
+const loading = ref(false);
+const items = ref([]);
+const dialog = ref(false);
+const deletingId = ref(null);
+const schema = yup.object({
+  firstName: yup.string().required('First name is required'),
+  lastName: yup.string().required('Last name is required'),
+  phone: yup.string()
+    .required('Phone number is required')
+    .matches(/^[0-9]{10}$/, 'Phone number must be 10 digits'),
+  email: yup.string()
+    .required('Email is required')
+    .email('Email must be valid'),
+  pincode: yup.string()
+    .required('Pincode is required')
+    .matches(/^[0-9]{6}$/, 'Pincode must be 6 digits'),
+  country: yup.string().required('Country is required'),
+  state: yup.string().required('State is required'),
+  city: yup.string().required('City is required'),
+  role: yup.string().required('Role is required'),
+});
 
-const firstName = ref('');
-const lastName = ref('');
-const phoneNo = ref('');
-const emailAddress = ref('');
-const pincode = ref('');
-const country = ref('India');
-const state = ref('');
-const city = ref('');
+const { handleSubmit, resetForm } = useForm({
+  validationSchema: schema,
+  initialValues: {
+    firstName: '',
+    lastName: '',
+    phone: '',
+    email: '',
+    pincode: '',
+    country: 'India',
+    state: '',
+    city: '',
+    role: '',
+  }
+});
+
+const { value: firstName, errorMessage: firstNameError } = useField('firstName');
+const { value: lastName, errorMessage: lastNameError } = useField('lastName');
+const { value: phone, errorMessage: phoneError } = useField('phone');
+const { value: email, errorMessage: emailError } = useField('email');
+const { value: pincode, errorMessage: pincodeError } = useField('pincode');
+const { value: country } = useField('country');
+const { value: state, errorMessage: stateError } = useField('state');
+const { value: city, errorMessage: cityError } = useField('city');
+const { value: role, errorMessage: roleError } = useField('role');
+
 const roles = ref([]);
-const agents = ref([]);
-const role_name = ref('');
-const adminSubmit = async (event) => {
-    event.preventDefault();
-    const adminData = {
-        firstName: firstName.value,
-        lastName: lastName.value,
-        phone: phoneNo.value,
-        email: emailAddress.value,
-        pincode: pincode.value,
-        country: country.value,
-        state: state.value,
-        city: city.value,
-        role_name: role_name.value
-    }    
-    console.log('admin Data:', adminData);
-    try {
-        const response = await axios.post("http://127.0.0.1:8000/api/create-user", adminData);
-        console.log('Admin created successfully:', response.data);
-        
-        // Add the new admin to the agents array
-        agents.value.push({
-            firstName: adminData.firstName,
-            lastName: adminData.lastName,
-            phone: adminData.phone,
-            email: adminData.email,
-            city: adminData.city,
-            state: adminData.state,
-            updated_at: new Date().toISOString() // Assuming you want to set the current date
-        });
-        
-        // Optionally, reset the form fields
-        firstName.value = '';
-        lastName.value = '';
-        phoneNo.value = '';
-        emailAddress.value = '';
-        pincode.value = '';
-        country.value = 'India';
-        state.value = '';
-        city.value = '';
-        role_name.value = '';
-        
-    } catch (error) {
-        console.error('Error creating admin:', error);
-    }
-}
-const getAgents = async  () => {
-    console.log('dsdsd');
-    
-    try {
-        const response  = await axios.get('http://127.0.0.1:8000/api/get-agents');
-        console.log(response.data.data.allAgents);
-        agents.value = response.data.data.allAgents
-    } catch (error) {
-        
-    }
-}
-const fetchRoles = async () => {
+const getAgents = async () => {
   try {
-    const response = await axios.get("http://127.0.0.1:8000/api/roles");
-    roles.value = response.data; 
-    console.log(roles.value);
+    const response = await axios.get("http://127.0.0.1:8000/api/get-agents");
+    items.value = response.data.data.allAgents;
   } catch (error) {
     console.error("API Error:", error);
   }
 };
 
-const fetchData = async () => {
-    await fetchRoles();
-    await getAgents();
+const fetchRoles = async () => {
+  try {
+    const response = await axios.get("http://127.0.0.1:8000/api/roles");
+    const roleNames = response.data.map(role => role.name);
+    roles.value = roleNames;
+  } catch (error) {
+    console.error("API Error:", error);
+  }
 };
+
+const editAdmin = async (a) =>{
+console.log('edited',a);
+}
+const deleteAdmin = async (selectedAdminId) => {
+  try {
+    deletingId.value = selectedAdminId;
+    const response = await axios.delete(`http://127.0.0.1:8000/api/delete-admin/${selectedAdminId}`);
+    console.log('Deleted user', response);
+    deletingId.value = null;
+    await getAgents(); 
+    toast.success('Admin deleted successfully!');
+  } catch (error) {
+    deletingId.value = null;
+    console.error("Error deleting admin:", error);
+    toast.error('Failed to delete admin. Please try again.'); 
+  }
+}
+const fetchData = async () => {
+  await fetchRoles();
+  await getAgents();
+};
+
+const onSubmit = handleSubmit(async (values) => {
+  loading.value = true;
+  try {
+    await axios.post("http://127.0.0.1:8000/api/create-user", values);
+    dialog.value = false;
+    toast.success('Admin created successfully!');
+    await getAgents();
+    resetForm();
+  } catch (error) {
+    console.error("Form Submission Error:", error);
+  } finally {
+    loading.value = false;
+  }
+});
 
 onMounted(fetchData);
 </script>
-<template>
-    <div>
-        <div class="card">
-        <div class="card-body">
-            <div class="col">
-                <div class="head-section" style="padding: 10px 5px; background: #e6c3ff; border-radius: 5px;">
-                    <div class="head-inner d-flex justify-content-between">
-                        <form class="d-flex nav-search">
-                            <div class="input-group">
-                                <input type="text" class="form-control" placeholder="Some">
-                                <button class="btn" type="submit"><i class='bx bx-search'></i>
-                                </button>
-                            </div>
-				        </form>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleVerticallycenteredModal">+ New Admin</button>
 
-                    </div>
-                </div>
-                <!-- Modal New admin -->
-                <div class="modal fade" id="exampleVerticallycenteredModal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Add Admin</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <form class="row g-3" @submit.prevent="adminSubmit">
-                                    <div class="col-md-6">
-                                        <label for="inputLastName1" class="form-label">First Name <span class="text-danger">*</span></label>
-                                        <div class="input-group"> <span class="input-group-text bg-transparent"><i class='bx bxs-user'></i></span>
-                                            <input type="text" class="form-control border-start-0" id="inputLastName1" placeholder="First Name" v-model="firstName" >
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="inputLastName2" class="form-label">Last Name <span class="text-danger">*</span></label>
-                                        <div class="input-group"> <span class="input-group-text bg-transparent"><i class='bx bxs-user'></i></span>
-                                            <input type="text" class="form-control border-start-0" id="inputLastName2" placeholder="Last Name" v-model="lastName" >
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="inputPhoneNo" class="form-label">Phone No <span class="text-danger">*</span></label>
-                                        <div class="input-group"> <span class="input-group-text bg-transparent"><i class='bx bxs-phone'></i></span>
-                                            <input type="text" class="form-control border-start-0" id="inputPhoneNo" placeholder="Phone No" v-model="phoneNo" >
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="inputEmailAddress" class="form-label">Email Address <span class="text-danger">*</span></label>
-                                        <div class="input-group"> <span class="input-group-text bg-transparent"><i class='bx bxs-envelope'></i></span>
-                                            <input type="email" class="form-control border-start-0" id="inputEmailAddress" placeholder="Email Address" v-model="emailAddress" >
-                                        </div>
-                                    </div>
-                            
-                                    <div class="col-md-6">
-                                        <label for="inputPincode" class="form-label">Pincode <span class="text-danger">*</span></label>
-                                        <div class="input-group"> <span class="input-group-text bg-transparent"><i class='bx bxs-map'></i></span>
-                                        <input type="text" class="form-control" id="inputPincode" placeholder="Enter Pincode" v-model="pincode" >
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent"><i class='bx bxs-shield'></i></span>
-                                            <select class="form-select" id="role" v-model="role_name">
-                                                <option value="" selected>Select Role</option>
-                                                <option v-for="role in roles" :key="role.id" :value="role.name">{{ role.name.charAt(0).toUpperCase() + role.name.slice(1) }}</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="inputCountry" class="form-label">Country <span class="text-danger">*</span></label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent"><i class='bx bxs-globe'></i></span>
-                                            <select class="form-select" id="inputCountry" v-model="country" >
-                                                <option value="India" selected>India</option>
-                                                <option value="USA">USA</option>
-                                                <option value="UK">UK</option>
-                                                <option value="Canada">Canada</option>
-                                                <!-- Add more countries as needed -->
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="inputState" class="form-label">State <span class="text-danger">*</span></label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent"><i class='bx bxs-map'></i></span>
-                                            <select class="form-select" id="inputState" v-model="state" >
-                                                <option value="" selected>Select State</option>
-                                                <option value="Maharashtra">Maharashtra</option>
-                                                <option value="Karnataka">Karnataka</option>
-                                                <option value="Delhi">Delhi</option>
-                                                <option value="Tamil Nadu">Tamil Nadu</option>
-                                                <!-- Add more states as needed -->
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="inputCity" class="form-label">City <span class="text-danger">*</span></label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent"><i class='bx bxs-building'></i></span>
-                                            <select class="form-select" id="inputCity" v-model="city" >
-                                                <option value="" selected>Select City</option>
-                                                <option value="Mumbai">Mumbai</option>
-                                                <option value="Bangalore">Bangalore</option>
-                                                <option value="Delhi">Delhi</option>
-                                                <option value="Chennai">Chennai</option>
-                                                <!-- Add more cities as needed -->
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                        <button type="submit" class="btn btn-primary">Save</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <table class="table mb-0 table-striped">
-                <thead>
-                    <tr>
-                        <th scope="col">#</th>
-                        <th scope="col">Name</th>
-                        <th scope="col">Email</th>
-                        <th scope="col">Phone</th>
-                        <th scope="col">City</th>
-                        <th scope="col">State</th>
-                        <th scope="col">Created Data</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(agent, index) in agents" :key="index">
-                        <th scope="row">{{index}}</th>
-                        <td>{{agent.firstName}} {{agent.lastName}}</td>
-                        <td>{{agent.email}}</td>
-                        <td>{{agent.phone}}</td>
-                        <td>{{agent.city}}</td>
-                        <td>{{agent.state}}</td>
-                        <td>{{agent.updated_at}}</td>
-                    </tr>
-                  
-                </tbody>
-            </table>
-        </div>
-		</div>
-    </div>
+<template>
+  	<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+					<div class="breadcrumb-title pe-3">Admin</div>
+					<div class="ps-3">
+						<nav aria-label="breadcrumb">
+							<ol class="breadcrumb mb-0 p-0">
+								<li class="breadcrumb-item"><a href="javascript:;"><i class="bx bx-user"></i></a>
+								</li>
+								<li class="breadcrumb-item active" aria-current="page">List Admins</li>
+							</ol>
+						</nav>
+					</div>
+					<div class="ms-auto">
+						<div class="btn-group">
+							   
+          <v-btn @click="dialog = true" color="primary" class="ml-2">
+           + Add Agent
+          </v-btn>
+						</div>
+					</div>
+				</div>
+
+      <!-- Dialog with Form -->
+      <v-dialog v-model="dialog" max-width="800px">
+        <v-card>
+          <v-card-title class="text-h5" color="#ff521d">
+            Add New Agent
+          </v-card-title>
+          <v-card-text>
+            <v-form>
+              <v-container>
+                <v-row>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="firstName"
+                      label="First Name"
+                      required
+                      variant="outlined"
+                      color="#ff521d"
+                      placeholder="Enter first name"
+                      :error-messages="firstNameError"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="lastName"
+                      label="Last Name"
+                      required
+                      variant="outlined"
+                      color="#ff521d"
+                      placeholder="Enter last name"
+                      :error-messages="lastNameError"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="phone"
+                      label="Phone No"
+                      required
+                      type="tel"
+                      maxlength="10"
+                      variant="outlined"
+                      color="#ff521d"
+                      placeholder="Enter phone number"
+                      :error-messages="phoneError"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="email"
+                      label="Email Address"
+                      type="email"
+                      required
+                      variant="outlined"
+                      color="#ff521d"
+                      placeholder="Enter email address"
+                      :error-messages="emailError"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="pincode"
+                      label="Pincode"
+                      required
+                      variant="outlined"
+                      color="#ff521d"
+                      placeholder="Enter pincode"
+                      :error-messages="pincodeError"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="country"
+                      label="Country"
+                      required
+                      disabled
+                      variant="outlined"
+                      color="#ff521d"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="state"
+                      label="State"
+                      required
+                      variant="outlined"
+                      color="#ff521d"
+                      placeholder="Enter state"
+                      :error-messages="stateError"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="city"
+                      label="City"
+                      required
+                      variant="outlined"
+                      color="#ff521d"
+                      placeholder="Enter city"
+                      :error-messages="cityError"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12">
+                    <v-select
+                      v-model="role"
+                      :items="roles"
+                      item-text="name"
+                      item-value="id"
+                      label="Role"
+                      required
+                      variant="outlined"
+                      color="#ff521d"
+                      :error-messages="roleError"
+                    ></v-select>
+                  </v-col>
+                </v-row>
+              </v-container>
+            </v-form>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn text @click="dialog = false" color="red">Cancel</v-btn>
+            <v-btn :loading="loading" @click="onSubmit" color="#ff521d"> 
+              Submit
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+  <!-- Data Table -->
+  <v-data-table :items="items" :loading="loading">
+    <template v-slot:loading>
+      <v-skeleton-loader type="table-row@6"></v-skeleton-loader>
+    </template>
+    <template #headers>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Role</th>
+        <th>City</th>
+        <th>State</th>
+        <th>Created Date</th>
+        <th>Actions{{ deletingId }}</th>
+      </tr>
+    </template>
+    <template #item="{ item }">
+      <tr>
+        <td>{{ item.firstName }} {{ item.lastName }}</td>
+        <td>{{ item.email }}</td>
+        <td>{{ item.phone }}</td>
+        <td>{{ item.roles.map(role => role.name.charAt(0).toUpperCase() + role.name.slice(1)).join(', ') }}</td>
+        <td>{{ item.city }}</td>
+        <td>{{ item.state }}</td>
+        <td>{{ item.created_at }}</td>
+        <td class="d-flex align-center gap-2">
+          <v-icon color="warning" icon="mdi-pencil" size="x-large" @click="editAdmin(item.id)"></v-icon>
+              <v-progress-circular
+              :width="3"
+              color="red"
+              indeterminate
+              v-if="deletingId === item.id"
+            ></v-progress-circular>
+          <v-icon color="danger" icon="mdi-trash-can" size="x-large" @click="deleteAdmin(item.id)" v-else></v-icon>
+       
+        </td>
+      </tr>
+    </template>
+  </v-data-table>
 </template>
