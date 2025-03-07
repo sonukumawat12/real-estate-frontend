@@ -7,7 +7,9 @@ import { toast } from 'vue3-toastify';
 const loading = ref(false);
 const items = ref([]);
 const dialog = ref(false);
+const deleteConfirmationDialog = ref(false);
 const deletingId = ref(null);
+const isLoading = ref(false);
 const schema = yup.object({
   firstName: yup.string().required('First name is required'),
   lastName: yup.string().required('Last name is required'),
@@ -74,18 +76,25 @@ const fetchRoles = async () => {
 const editAdmin = async (a) =>{
 console.log('edited',a);
 }
-const deleteAdmin = async (selectedAdminId) => {
+const deleteConfirmation = (adminId) => {
+  deletingId.value = adminId;
+  deleteConfirmationDialog.value = true;
+}
+const deleteAdmin = async () => {
   try {
-    deletingId.value = selectedAdminId;
+    isLoading.value = true
+    const selectedAdminId = deletingId.value;
+    if (!selectedAdminId) return;
+    
     const response = await axios.delete(`http://127.0.0.1:8000/api/delete-admin/${selectedAdminId}`);
-    console.log('Deleted user', response);
-    deletingId.value = null;
-    await getAgents(); 
+    await getAgents();
     toast.success('Admin deleted successfully!');
-  } catch (error) {
+    deleteConfirmationDialog.value = false;
+    isLoading.value = false
     deletingId.value = null;
+  } catch (error) {
     console.error("Error deleting admin:", error);
-    toast.error('Failed to delete admin. Please try again.'); 
+    toast.error('Failed to delete admin. Please try again.');
   }
 }
 const fetchData = async () => {
@@ -273,7 +282,7 @@ onMounted(fetchData);
         <th>City</th>
         <th>State</th>
         <th>Created Date</th>
-        <th>Actions{{ deletingId }}</th>
+        <th>Actions</th>
       </tr>
     </template>
     <template #item="{ item }">
@@ -287,16 +296,46 @@ onMounted(fetchData);
         <td>{{ item.created_at }}</td>
         <td class="d-flex align-center gap-2">
           <v-icon color="warning" icon="mdi-pencil" size="x-large" @click="editAdmin(item.id)"></v-icon>
-              <v-progress-circular
-              :width="3"
-              color="red"
-              indeterminate
-              v-if="deletingId === item.id"
-            ></v-progress-circular>
-          <v-icon color="danger" icon="mdi-trash-can" size="x-large" @click="deleteAdmin(item.id)" v-else></v-icon>
-       
+          <v-icon 
+            color="error" 
+            icon="mdi-trash-can" 
+            size="x-large" 
+            @click="deleteConfirmation(item.id)"
+          ></v-icon>
         </td>
       </tr>
+      <v-dialog
+        v-model="deleteConfirmationDialog"
+        max-width="400"
+        persistent
+      >
+        <v-card>
+          <v-card-title class="text-h5">
+            Confirm Deletion
+          </v-card-title>
+          <v-card-text>
+            Are you sure you want to delete this admin.
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn
+              color="grey-darken-1"
+              variant="text"
+              @click="deleteConfirmationDialog = false"
+            >
+              Cancel
+            </v-btn>
+            <v-btn
+              color="error"
+              variant="elevated"
+              @click="deleteAdmin"
+              :loading="isLoading"
+            >
+              Delete
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </template>
   </v-data-table>
 </template>
