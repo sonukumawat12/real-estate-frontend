@@ -42,11 +42,11 @@ import { RouterLink } from 'vue-router'
 				</li>
 				<li class="menu-label">UI Elements</li>
 				<li>
-					<a href="widgets.html">
-						<div class="parent-icon"><i class='bx bx-briefcase-alt-2'></i>
+					<RouterLink to="/leads">
+						<div class="parent-icon"><i class='bx bx-user-pin'></i>
 						</div>
-						<div class="menu-title">Widgets</div>
-					</a>
+						<div class="menu-title">Leads</div>
+					</RouterLink>
 				</li>
 				<li>
 					<a href="javascript:;" class="has-arrow">
