@@ -1,25 +1,45 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from '@/plugins/axios'
 import { toast } from 'vue3-toastify'
 import { useForm, useField } from 'vee-validate'
 import * as yup from 'yup'
-
+import moment from 'moment'
+import { watch } from 'vue'
+// Dialog and data list
 const dialog = ref(false)
 const leads = ref([])
 
-// Form fields
-const name = ref('')
-const phone = ref('')
-const email = ref('')
-const source = ref('')
-const leadType = ref('')
-const assignedTo = ref('')
-const notes = ref('')
+watch(dialog, (newVal, oldVal) => {
+
+    if (!newVal) {
+      console.log('sssssssssss');
+      resetForm()
+    }
+})
+
+// Validation Schema
 const schema = yup.object({
   name: yup.string().required('Name is required'),
   email: yup.string().email('Invalid email').required('Email is required'),
+  phone: yup.string().required('Phone is required').min(10, 'Phone must be at least 10 digits'),
+  source: yup.string().required('Source is required'),
+  leadType: yup.string().required('Type is required'),
+  assignedTo: yup.string().required('Assigned to is required'),
 })
+
+// useForm & useField (validation)
+const { handleSubmit } = useForm({ validationSchema: schema })
+
+const { value: name, errorMessage: nameError } = useField('name')
+const { value: email, errorMessage: emailError } = useField('email')
+const { value: phone, errorMessage: phoneError } = useField('phone')
+const { value: source, errorMessage: sourceError } = useField('source')
+const { value: leadType, errorMessage: leadTypeError} = useField('leadType')
+const { value: assignedTo, errorMessage: assignedToError} = useField('assignedTo')
+
+const notes = ref('')
+const loading = ref(false)
 // Options
 const sources = ['Facebook', 'Google Ads', 'Walk-in', 'Referral']
 const leadTypes = ['Buyer', 'Seller']
@@ -28,10 +48,8 @@ const agents = [
   { id: 2, name: 'Anjali Mehta' },
   { id: 3, name: 'Aman Kumar' }
 ]
-const { handleSubmit, errors } = useForm({
-  validationSchema: schema
-})
 
+// Fetching leads
 const fetchLeads = async () => {
   try {
     const response = await axios.get('/leads')
@@ -41,12 +59,13 @@ const fetchLeads = async () => {
   }
 }
 
-// Call fetch on mount
 onMounted(() => {
   fetchLeads()
 })
 
+// Reset
 const resetForm = () => {
+  console.log('sssssssaasasasass')
   name.value = ''
   phone.value = ''
   email.value = ''
@@ -56,9 +75,10 @@ const resetForm = () => {
   notes.value = ''
 }
 
-const submitLead = async () => {
-  if (!name.value || !phone.value || !source.value || !leadType.value || !assignedTo.value) {
-    alert('Please fill in all required fields.')
+// Submit
+const submitLead = handleSubmit(async () => {
+  if (!phone.value || !source.value || !leadType.value || !assignedTo.value) {
+    toast.error('Please fill in all required fields.')
     return
   }
 
@@ -73,17 +93,26 @@ const submitLead = async () => {
   }
 
   try {
+    loading.value = true
     const response = await axios.post('/leads', payload)
-    
-    leads.value.push(response.data.data)
+    leads.value.unshift(response.data.data)
     resetForm()
     dialog.value = false
     toast.success("Lead added successfully!")
   } catch (error) {
-    console.error(error.response.data.message)
-    toast.error(error.response.data.message)
+    console.error(error.response?.data?.message || error.message)
+    toast.error(error.response?.data?.message || "Something went wrong")
+  } finally {
+    loading.value = false
   }
-}
+})
+
+const formattedLeads = computed(() =>
+  leads.value.map(lead => ({
+    ...lead,
+    created_at: lead.created_at ? moment(lead.created_at).format('YYYY-MM-DD hh:mm A') : ''
+  }))
+)
 </script>
 
 
@@ -94,7 +123,7 @@ const submitLead = async () => {
       <v-toolbar flat>
         <v-toolbar-title>Lead Management</v-toolbar-title>
         <v-spacer />
-        <v-btn color="primary" @click="dialog = true">
+        <v-btn color="primary" @click="dialog = true" variant="tonal">
           + Add Lead
         </v-btn>
       </v-toolbar>
@@ -109,9 +138,10 @@ const submitLead = async () => {
           { title: 'Email', key: 'email' },
           { title: 'Source', key: 'source' },
           { title: 'Type', key: 'type' },
-          { title: 'Assigned To', key: 'assigned_to' }
+          { title: 'Assigned To', key: 'assigned_to' },
+          { title: 'Created At', key: 'created_at' }
         ]"
-        :items="leads"
+        :items="formattedLeads"
         class="elevation-1"
       ></v-data-table>
     </v-card>
@@ -124,15 +154,15 @@ const submitLead = async () => {
           <v-form @submit.prevent="submitLead">
             <v-row dense>
               <v-col cols="12" md="6">
-                <v-text-field v-model="name" label="Name" required outlined />
+                <v-text-field v-model="name" label="Name" required  variant="outlined" :error-messages="nameError" type="text" maxlength="50" />
               </v-col>
 
               <v-col cols="12" md="6">
-                <v-text-field v-model="email" label="Email" outlined />
+                <v-text-field v-model="email" label="Email" variant="outlined" :error-messages="emailError" type="email" maxlength="50" />
               </v-col>
 
               <v-col cols="12" md="6">
-                <v-text-field v-model="phone" label="Phone" required outlined />
+                <v-text-field v-model="phone" label="Phone" required variant="outlined"  :error-messages="phoneError" maxlength="10" />
               </v-col>
 
               <v-col cols="12" md="6">
@@ -140,8 +170,9 @@ const submitLead = async () => {
                   v-model="source"
                   :items="sources"
                   label="Lead Source"
-                  outlined
+                  variant="outlined"
                   required
+                  :error-messages="sourceError"
                 />
               </v-col>
 
@@ -150,8 +181,9 @@ const submitLead = async () => {
                   v-model="leadType"
                   :items="leadTypes"
                   label="Lead Type"
-                  outlined
+                  variant="outlined"
                   required
+                  :error-messages="leadTypeError"
                 />
               </v-col>
 
@@ -162,20 +194,26 @@ const submitLead = async () => {
                   :item-title="item => item.name"
                   :item-value="item => item.id"
                   label="Assign To Agent"
-                  outlined
+                  variant="outlined"
                   required
+                  :error-messages="assignedToError"
                 />
               </v-col>
 
               <v-col cols="12">
-                <v-textarea v-model="notes" label="Notes" rows="2" outlined />
+                <v-textarea v-model="notes" label="Notes (Optional)" rows="2" variant="outlined" />
               </v-col>
             </v-row>
           </v-form>
         </v-card-text>
         <v-card-actions class="justify-end">
-          <v-btn text @click="dialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="submitLead">Save</v-btn>
+          <v-btn text @click="dialog = false" :disabled="loading">Cancel</v-btn>
+          <v-btn color="primary" @click="submitLead"  variant="tonal" :disabled="loading">
+            <span v-if="!loading">Save</span>
+            <span v-else>
+              <v-progress-circular indeterminate size="20" width="2" color="white"></v-progress-circular>
+            </span>
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
