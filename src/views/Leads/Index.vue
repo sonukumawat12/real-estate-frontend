@@ -98,13 +98,13 @@ const submitLead = handleSubmit(async () => {
     leads.value.unshift(response.data.data)
     resetForm()
     dialog.value = false
+    loading.value = false
     toast.success("Lead added successfully!")
   } catch (error) {
     console.error(error.response?.data?.message || error.message)
     toast.error(error.response?.data?.message || "Something went wrong")
-  } finally {
     loading.value = false
-  }
+  } 
 })
 
 const formattedLeads = computed(() =>
@@ -113,6 +113,13 @@ const formattedLeads = computed(() =>
     created_at: lead.created_at ? moment(lead.created_at).format('YYYY-MM-DD hh:mm A') : ''
   }))
 )
+
+// Function to open lead profile in new tab
+const openLeadProfile = (leadId) => {
+  
+  const url = `/leads/${leadId}/profile`
+  window.open(url, '_blank')
+}
 </script>
 
 
@@ -139,11 +146,29 @@ const formattedLeads = computed(() =>
           { title: 'Source', key: 'source' },
           { title: 'Type', key: 'type' },
           { title: 'Assigned To', key: 'assigned_to' },
-          { title: 'Created At', key: 'created_at' }
+          { title: 'Created At', key: 'created_at' },
+          { title: 'Actions', key: 'actions', sortable: false }
         ]"
         :items="formattedLeads"
         class="elevation-1"
-      ></v-data-table>
+      >
+        <template v-slot:item.actions="{ item }">
+          <v-tooltip text="View Profile">
+            <template v-slot:activator="{ props }">
+              <v-btn
+                icon
+                size="small"
+                color="primary"
+                variant="text"
+                @click="openLeadProfile(item.id)"
+                v-bind="props"
+              >
+                <v-icon>mdi-eye</v-icon>
+              </v-btn>
+            </template>
+          </v-tooltip>
+        </template>
+      </v-data-table>
     </v-card>
 
     <!-- Add Lead Dialog -->
